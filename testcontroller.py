@@ -6,47 +6,17 @@ import sys
 import commands
 import time
 import datetime
+
+from config import *
 from multiprocessing import Process,Pipe,Event
 from OpenSSL.SSL import SSLv3_METHOD
-
 from twisted.mail.smtp import ESMTPSenderFactory
 from twisted.python.usage import Options, UsageError
 from twisted.internet.ssl import ClientContextFactory
 from twisted.internet.defer import Deferred
 from twisted.internet import reactor
 
-BRICKS_IPADDRS = []
-PATCHFILE = ""
-NFSSERVER_ADDR = ""
-LOGFILE = "/tmp/testbot-log-"
-LOGFILEFD = None
-CONTROL_LOG = None
-EMAILCONTROLLOG = False
-NFSCLIENT_ADDR = ""
-RUNTESTS = False
-SETUPBRICKS = False
-LOGSCPURL = ""
-
-#if the LOGSCPURL places the logfile on a webserver, edit the variable below so
-#that the email contains the HTTP url to the log rather than the scp URL,
-#that way, one could just click on the HTTP url and be taken to the log.
-LOGDOWNLOADURL = "http://shell.gluster.com/~anush/testbot"
-MAILUSER = ""
-MAILPWD = ""
-MAILSRV = ""
-MAILTO = ""
-TESTVOLUMES = []
-START = time.time()
-START_TIMESTR = time.strftime("%d-%b-%Y-%H-%M-%S", time.localtime())
-END = None
-SRC_DOWNLOAD_DIR = "/tmp/shehjart-glusterfs-"+START_TIMESTR
-CONTROL_LOGFILE = "/tmp/testbot-control-log-"+START_TIMESTR
-MOUNTPOINT = "/tmp/shehjart-testsdir-"+START_TIMESTR+"/"
-TESTS_DOWNLOAD_DIR = "/tmp/shehjart-testinfos-"+START_TIMESTR+"/"
-TESTBOT_DOWNLOAD_DIR = "/tmp/shehjart-testbot-"+START_TIMESTR+"/"
-DAEMONIZE = True
-TESTTYPE = ""
-TESTNAMES = ["*"]
+PATCHFILE=""
 
 def LogSummary (logline):
         CONTROL_LOG.write(logline)
@@ -54,6 +24,26 @@ def LogSummary (logline):
 #                sys.stdout.write(logline)
         CONTROL_LOG.flush()
 
+def create_bricks():
+    VOL_PAR=""
+    if REPLICA:
+	    VOL_PAR +=" replica 2"
+
+    if TRANSPORT:
+	    VOL_PAR +=" transport " + TRANSPORT
+
+    if len(BRICKS_IPADDRS) == 1:
+	    if REPLICA:
+		    NUM_BRICKS=2
+	    NUM_BRICKS=int(NUM_BRICKS)
+	    for i in range(NUM_BRICKS):
+		    VOL_PAR += " " + BRICKS_IPADDRS[0] + ":" + SERVER_EXPORT + "/"+ str(i)
+    else:
+	    for i in BRICKS_IPADDRS:
+		    VOL_PAR += " " + i + ":" + SERVER_EXPORT + "/1"
+    return VOL_PAR
+   
+	
 def sendmail(
     authenticationUsername, authenticationSecret,
     fromAddress, toAddress,
@@ -336,7 +326,7 @@ def StartUpVolumesOnBrick (brick, controlpipe, startvols, eventlist):
 
         if startvols:
 
-                for volume in TESTVOLUMES:
+                for volume in TESTVOLUME:
                         LogSummary("Stopping volume " + volume + " on " + brick +"\n")
                         WriteBrickLog (controlpipe, brick, "Stopping volume " + volume + " on " + brick)
                         (status, output) = commands.getstatusoutput("ssh root@"+brick+" gluster volume stop " +volume+" --mode=script\;")
@@ -381,11 +371,10 @@ def StartUpVolumesOnBrick (brick, controlpipe, startvols, eventlist):
                 LogSummary("All bricks started glusterd..Starting volumes on " + brick + "\n")
                 WriteBrickLog (controlpipe, brick, "All bricks started glusterd..Starting volumes on " + brick)
 
-                for volume in TESTVOLUMES:
+                for volume in TESTVOLUME:
 			LogSummary("Creating volume " + volume +" on " + brick + "\n")
                         WriteBrickLog (controlpipe, brick, "Create volume " + volume + " on " + brick)
-                        (status, output) = commands.getstatusoutput("ssh root@"+brick+" gluster volume create " + volume + " " + VOL_PAR + "\;")
-			print output
+                        (status, output) = commands.getstatusoutput("ssh root@"+brick+" gluster volume create " + volume + " " + str(VOL_PAR) + "\;")
 			WriteBrickLog (controlpipe, brick, output)
 
                         LogSummary("Starting volume " +volume +" on " + brick + "\n")
@@ -463,7 +452,7 @@ def RunTestFromList(testarg):
 
         
         for tinfo in testinfos:
-                for volume in TESTVOLUMES:
+                for volume in TESTVOLUME:
                         testcmd = frametestcommand(tinfo, volume)
                         testname = os.path.basename(tinfo)
                         printstr = testname + " on " + NFSCLIENT_ADDR + " on volume " + volume +"\n"
@@ -612,7 +601,7 @@ def PrintConfig():
 def usage():
         print "USAGE: testcontroller -p <patch-to-test> -b <brick1,brick2,brick3,...brickN>"
         print "\t-p <patch-to-apply> is optional, if not specified, will just setup the bricks with latest git"
-        print "\t-b <bricks> is required, specify a comma-separated list of bricks on which to setup GlusterFS"
+        print "\t-b <branch> git branch for GlusterFS"
         print "\t            for testing."
         print "\t-e          Email controller test summary instead of printing on screen."
         print "\t-l <log>    Path to logfile where all output is dumped."
@@ -646,51 +635,33 @@ if __name__ == "__main__":
                 usage()
                 sys.exit(0)
 
-        if "-b" not in sys.argv:
-                print "Must provide bricks list"
-                usage ()
-                sys.exit(0)
-
         if "-p" in sys.argv:
                 PATCHFILE = sys.argv[sys.argv.index("-p") + 1]
         
-        if "-b" in sys.argv:
-                blist = sys.argv[sys.argv.index("-b") + 1]
-                BRICKS_IPADDRS = blist.split(",")
-
-        if "-l" in sys.argv:
-                LOGFILE = sys.argv[sys.argv.index("-l") + 1]
-        else:
-                LOGFILE = LOGFILE + timestr
-                LOGFILEFD = open (LOGFILE, "a")
-
-        if "-n" in sys.argv:
-                NFSSERVER_ADDR = sys.argv[sys.argv.index("-n") + 1]
-		BRICK_MGMT = BRICKS_IPADDRS[0]
-        else:
-                NFSSERVER_ADDR = BRICKS_IPADDRS[0]
-		BRICK_MGMT = BRICKS_IPADDRS[0]
+	LOGFILE = LOGFILE + timestr
+	LOGFILEFD = open (LOGFILE, "a")
 
         if "-t" in sys.argv:
                 RUNTESTS = True
+	
+	if "-n" in sys.argv:
+                NFSSERVER_ADDR = sys.argv[sys.argv.index("-n") + 1]
+        else:
+                NFSSERVER_ADDR = BRICKS_IPADDRS[0]
+
         
         if "-c" in sys.argv:
                 NFSCLIENT_ADDR = sys.argv[sys.argv.index("-c") + 1]
-
-	if "-g" in sys.argv:
-		NOGIT = True
-	
+	else:
+	        NFSCLIENT_ADDR = BRICKS_IPADDRS[0]
 
         if RUNTESTS and len(NFSCLIENT_ADDR) == 0:
                 print "Tests cannot be run without a NFS client address."
                 usage ()
                 sys.exit(0)
-
-        if "-s" in sys.argv:
+	
+	if "-s" in sys.argv:
                 SETUPBRICKS = True
-
-        if "-u" in sys.argv:
-                LOGSCPURL = sys.argv[sys.argv.index("-u") + 1]
 
         if "-e" not in sys.argv:
                 CONTROL_LOG = sys.stdout
@@ -739,20 +710,15 @@ if __name__ == "__main__":
                         MAILTO = sys.argv[sys.argv.index("-R") + 1]
 
         if RUNTESTS:
-                if "-v" not in sys.argv:
-                        print "Must provide volume or volumes"
-                        usage ()
-                        sys.exit(0)
-                else:
-                        testvols = sys.argv[sys.argv.index("-v") + 1]
-                        TESTVOLUMES = testvols.split(",")
+		VOL_PAR = create_bricks()
+		mount_glusterfs()
 
-		if "-C" not in sys.argv:
+		"""if "-C" not in sys.argv:
 			print "Must provide volume create options"
 			usage ()
 			sys.exit(0)
                 else:
-                        VOL_PAR = sys.argv[sys.argv.index("-C") + 1]
+                        VOL_PAR = sys.argv[sys.argv.index("-C") + 1]"""
 			
 
                 """if "-y" not in sys.argv:
