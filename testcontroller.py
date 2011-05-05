@@ -6,6 +6,7 @@ import sys
 import commands
 import time
 import datetime
+import socket
 
 from config import *
 from multiprocessing import Process,Pipe,Event
@@ -42,7 +43,7 @@ def create_bricks():
 	    for i in BRICKS_IPADDRS:
 		    VOL_PAR += " " + i + ":" + SERVER_EXPORT + "/1"
     return VOL_PAR
-   
+
 	
 def sendmail(
     authenticationUsername, authenticationSecret,
@@ -104,11 +105,10 @@ def ebSentMessage(err):
 
 
 def SendResultsInMail ():
-
         CONTROL_LOG.close()
         log = file (CONTROL_LOGFILE)
+	print CONTROL_LOGFILE
         result = sendmail(MAILUSER, MAILPWD, MAILUSER, MAILTO, log, MAILSRV)
-
         result.addCallbacks(cbSentMessage, ebSentMessage)
         reactor.run()
 
@@ -390,6 +390,25 @@ def StartUpVolumesOnBrick (brick, controlpipe, startvols, eventlist):
                                 LogSummary ("Starting volume "+volume+" on " + brick + "..DONE\n")
                                 WriteBrickLog (controlpipe, brick, "Starting volume " + volume+" on " + brick + "..DONE")
 
+			time.sleep(5)
+
+			if FUSE:
+				LogSummary("Mounting FUSE client on  " + NFSCLIENT_ADDR + "\n")
+				WriteBrickLog (controlpipe, brick, "Mounting FUSE client on  " + NFSCLIENT_ADDR + "\n");
+			else:
+				LogSummary("Mounting NFS client on  " + NFSCLIENT_ADDR + "\n")
+				WriteBrickLog (controlpipe, brick, "Mounting NFS client on  " + NFSCLIENT_ADDR)
+				(status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+ " mkdir -p " + MOUNTPOINT + "\; mount "+ NFSCLIENT_ADDR + ":/" + volume + " " + MOUNTPOINT + "\;")
+				WriteBrickLog (controlpipe, brick, output)
+
+				if status <> 0:
+					LogSummary("Mounting NFS Client on" + NFSCLIENT_ADDR + "..FAILED\n")
+					WriteBrickLog (controlpipe, brick, "Mounting NFS Client on " + NFSCLIENT_ADDR + "..FAILED")
+					sys.exit(-1)
+				else:
+					LogSummary("Mounting NFS Client on" + NFSCLIENT_ADDR + "..DONE\n")
+                                        WriteBrickLog (controlpipe, brick, "Mounting NFS Client on " + NFSCLIENT_ADDR + "..DONE")
+
 
 def StartUpVolumesOnBricks():
         allprocs = []
@@ -434,94 +453,35 @@ def frametestcommand(testinfo, volume):
 
 
 def RunTestFromList(testarg):
-
-        LogSummary("Getting list of testinfos on " + NFSCLIENT_ADDR +"\n")
-        WriteLog ("Getting list of testinfos on " + NFSCLIENT_ADDR + "\n")
-        (status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+" ls "+TESTS_DOWNLOAD_DIR+"/"+TESTTYPE+"/"+testarg+".testinfo\;");
-        WriteLog (output + "\n")
-
-        if status <> 0:
-                LogSummary ("Getting list of testinfos on " + NFSCLIENT_ADDR + "..FAILED\n")
-                WriteLog ("Getting list of testinfos on " + NFSCLIENT_ADDR + "..FAILED\n")
-                return
-        else:
-                LogSummary ("Getting list of testinfos on " + NFSCLIENT_ADDR + "..DONE\n")
-                WriteLog ("Getting list of testinfos on " + NFSCLIENT_ADDR + "..DONE\n")
-        
-        testinfos = output.split("\n")
-
-        
-        for tinfo in testinfos:
-                for volume in TESTVOLUME:
-                        testcmd = frametestcommand(tinfo, volume)
-                        testname = os.path.basename(tinfo)
-                        printstr = testname + " on " + NFSCLIENT_ADDR + " on volume " + volume +"\n"
-                        LogSummary("Running "+ printstr)
-                        WriteLog("Running " + printstr)
-                        (status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+ " " + testcmd + "\;");
-                        WriteLog (output + "\n")
-
-                        if status <> 0:
-                                LogSummary("FAILED " + printstr)
-                                WriteLog("FAILED " + printstr)
-                        else:
-                                LogSummary("DONE " + printstr)
-                                WriteLog("DONE "+ printstr)
-
-
+	LogSummary("############# RUNNING " + testarg + " ###############\n")
+        WriteLog("############# RUNNING " + testarg + " ###############\n")
+	(status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+" " + TESTS_DOWNLOAD_DIR + "/jobs.sh " + testarg + " "  + MOUNTPOINT +" \;");
+	if status <> 0:
+		LogSummary("Dbench failed\n")
+                WriteLog ("Dbench..FAILED")
+		sys.exit(-1)
+	else:
+                LogSummary("Dbench..DONE\n")
+		WriteLog ("Dbench..DONE")
+	
 def RunTests():
-
-        LogSummary("Cloning testinfos on " + NFSCLIENT_ADDR + "\n")
-        WriteLog ("Cloning out testinfos on " + NFSCLIENT_ADDR + "\n")
-        (status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+" git clone git://git.gluster.com/users/shehjart/testinfos.git "+TESTS_DOWNLOAD_DIR + "\;");
-        WriteLog (output + "\n")
-
-        if status <> 0:
-                LogSummary("Cloning testinfos on " + NFSCLIENT_ADDR + "..FAILED\n")
-                WriteLog ("Cloning testinfos on " + NFSCLIENT_ADDR + "..FAILED\n")
-                return
-        else:
-                LogSummary("Cloning testinfos on " + NFSCLIENT_ADDR + "..DONE\n")
-                WriteLog ("Cloning testinfos on " + NFSCLIENT_ADDR + "..DONE\n")
-        
-        LogSummary ("Cloning testbot on " + NFSCLIENT_ADDR+"\n")
-        WriteLog ("Cloning out testbot on " + NFSCLIENT_ADDR + "\n")
-        (status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+" git clone git://git.gluster.com/users/shehjart/testbot.git  "+TESTBOT_DOWNLOAD_DIR +"\;");
-        WriteLog (output + "\n")
-
-        if status <> 0:
-                LogSummary("Cloning testbot on " + NFSCLIENT_ADDR + "..FAILED\n")
-                WriteLog ("Cloning testbot on " + NFSCLIENT_ADDR + "..FAILED\n")
-                return
-        else:
-                LogSummary("Cloning testbot on " + NFSCLIENT_ADDR + "..DONE\n")
-                WriteLog ("Cloning testbot on " + NFSCLIENT_ADDR + "..DONE\n")
-
-        LogSummary ("Creating test dir " + MOUNTPOINT + " on " + NFSCLIENT_ADDR +"\n")
-        WriteLog ("Creating test dir " + MOUNTPOINT + " on " + NFSCLIENT_ADDR + "\n")
-        (status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+" rm -rf " + MOUNTPOINT + "\;mkdir " + MOUNTPOINT +"\;");
-        WriteLog (output + "\n")
-
-        if status <> 0:
-                LogSummary("Creating test dir " + MOUNTPOINT + " on " + NFSCLIENT_ADDR + "..FAILED\n")
-                WriteLog ("Creating test dir " + MOUNTPOINT + " on " + NFSCLIENT_ADDR + "..FAILED\n")
-                return
-        else:
-                LogSummary("Creating test dir " + MOUNTPOINT + " on " + NFSCLIENT_ADDR + "..DONE\n")
-                WriteLog ("Creating test dir " + MOUNTPOINT + " on " + NFSCLIENT_ADDR + "..DONE\n")
-
         LogSummary("############# RUNNING TESTS ###############\n")
         WriteLog("############# RUNNING TESTS ###############\n")
+	(status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+" git clone git://github.com/anushshetty/glustersanitytools.git "+TESTS_DOWNLOAD_DIR+"\;");
 
         for testitem in TESTNAMES:
                 RunTestFromList(testitem);
+	LogSummary("Umounting client " + MOUNTPOINT + "\n")
+        WriteLog("Umounting client " + MOUNTPOINT + "\n")
+	(status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+" rm -rf " + MOUNTPOINT + "\; rm -rf "+TESTS_DOWNLOAD_DIR+"\;  umount " + MOUNTPOINT + "\;");
+	if status <> 0:
+                LogSummary("Umount failed\n")
+                WriteLog("Umount..FAILED")
+                sys.exit(-1)
+	else:
+                LogSummary("Umount..DONE\n")
+                WriteLog ("Umount..DONE")
 
-        LogSummary ("Cleaning dirs on " + NFSCLIENT_ADDR +"\n")
-        WriteLog ("Cleaning dirs on " + NFSCLIENT_ADDR + "\n")
-        (status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+" rm -rf " + MOUNTPOINT + "\; rm -rf "+TESTS_DOWNLOAD_DIR+"\; rm -rf "+TESTBOT_DOWNLOAD_DIR+"\;");
-        WriteLog (output + "\n")
-        LogSummary ("Cleaning dirs on " + NFSCLIENT_ADDR +"..DONE\n")
-        WriteLog ("Cleaning dirs on " + NFSCLIENT_ADDR + "..DONE\n")
 
 
 def ReportResults():
@@ -581,7 +541,7 @@ def main():
                 sys.exit(1)
         
         if RUNTESTS:
-                RunTests()
+		RunTests()
         else:
                 LogSummary ("Tests will not be run\n")
 
@@ -602,32 +562,7 @@ def usage():
         print "USAGE: testcontroller -p <patch-to-test> -b <brick1,brick2,brick3,...brickN>"
         print "\t-p <patch-to-apply> is optional, if not specified, will just setup the bricks with latest git"
         print "\t-b <branch> git branch for GlusterFS"
-        print "\t            for testing."
-        print "\t-e          Email controller test summary instead of printing on screen."
-        print "\t-l <log>    Path to logfile where all output is dumped."
-        print "\t            even is a log file is given. Default log is " + LOGFILE
-        print "\t-n <nfssrv> The brick to use as NFS server. Also used as the brick on which volume start and"
-        print "\t            stop commands are run. If this option is not given, the first brick from <bricks>"
-        print "\t            is used."
-        print "\t-t          Specify whether any tests are to be run after the build phase. By default, no tests"
-        print "\t            are run. Specify this argument to run the tests."
-        print "\t-c <nfsclient> The machine to use as nfs client."
-        print "\t-s          Enable or disable setting up of bricks. By default does not set up bricks with the given"
-        print "\t            patch and/or the latest glusterfs."
-        print "\t-u <scp-url> Upload the log file to the given url using scp."
-        print "\t-U <uname>  If -e is provided, the username for email must be given."
-        print "\t-P <pass>   Provide the password for the username above."
-        print "\t-S <srv>    Mail server address or hostname."
-        print "\t-R <addr>   Recipient of the test summary."
-        print "\t-v <vols>   Comma-separated names of volumes which will be started on the bricks and against which"
-        print "\t            tests will be run. These are the volumes that need to have been created by you before"
-        print "\t            running this script."
-        print "\t-N          Do not daemonize the testcontroller process"
-        print "\t-y <type>   Type of tests to run. <type> is the category of tests. The different categories are"
-        print "\t            the directories containing *.testinfo files in the testinfos git repo."
-        print "\t-a <name>   Specify the name of a test that needs to be run selectively. This must be the name of the"
-        print "\t            testinfo file without the .testinfo part. It can also be a glob like fileop* to run all"
-        print "\t            tests whose names start with fileop."
+
  
 if __name__ == "__main__":
         timestr = START_TIMESTR
@@ -643,6 +578,9 @@ if __name__ == "__main__":
 
         if "-t" in sys.argv:
                 RUNTESTS = True
+
+	if len(BRICKS_IPADDRS) == 0:
+		BRICKS_IPADDRS = [socket.gethostname()]
 	
 	if "-n" in sys.argv:
                 NFSSERVER_ADDR = sys.argv[sys.argv.index("-n") + 1]
@@ -663,74 +601,25 @@ if __name__ == "__main__":
 	if "-s" in sys.argv:
                 SETUPBRICKS = True
 
-        if "-e" not in sys.argv:
-                CONTROL_LOG = sys.stdout
-        else:
-                EMAILCONTROLLOG = True
-                try:
-                        os.remove(CONTROL_LOGFILE)
-                except:
-                        pass 
-                CONTROL_LOG = open (CONTROL_LOGFILE, "w")
-                CONTROL_LOG.write ("Subject: Testbot logs for test started on " + timestr + "\n")
-                LogSummary ("Complete log available at " + LOGFILE + " on controller\n")
-                if len(LOGDOWNLOADURL) > 0:
-                        LogSummary ("Complete log available at " + LOGDOWNLOADURL + "/"+os.path.basename(LOGFILE) +"\n")
-                elif len(LOGSCPURL) > 0:
-                        LogSummary ("Complete log available at " + LOGSCPURL + "/"+os.path.basename(LOGFILE) +"\n")
-
-        if EMAILCONTROLLOG:
-                if "-U" not in sys.argv:
-                        print "Must provide user account for sending test summary by email."
-                        usage()
-                        sys.exit(0)
-                else:
-                        MAILUSER = sys.argv[sys.argv.index("-U") + 1]
- 
-                if "-P" not in sys.argv:
-                        print "Must provide account password for sending test summary by email."
-                        usage()
-                        sys.exit(0)
-                else:
-                        MAILPWD = sys.argv[sys.argv.index("-P") + 1]
-       
-                if "-S" not in sys.argv:
-                        print "Must provide mail server for sending test summary by email."
-                        usage()
-                        sys.exit(0)
-                else:
-                        MAILSRV = sys.argv[sys.argv.index("-S") + 1]
-
         
-                if "-R" not in sys.argv:
-                        print "Must provide recipient address for sending test summary by email."
-                        usage()
-                        sys.exit(0)
-                else:
-                        MAILTO = sys.argv[sys.argv.index("-R") + 1]
-
-        if RUNTESTS:
+	if EMAILCONTROLLOG:
+	       try:
+		       os.remove(CONTROL_LOGFILE)
+	       except:
+		       pass 
+	       
+	       CONTROL_LOG = open (CONTROL_LOGFILE, "w")
+	       CONTROL_LOG.write ("Subject: Testbot logs for test started on " + timestr + "\n")
+	       LogSummary ("Complete log available at " + LOGFILE + " on controller\n")
+	       if len(LOGDOWNLOADURL) > 0:
+		       LogSummary ("Complete log available at " + LOGDOWNLOADURL + "/"+os.path.basename(LOGFILE) +"\n")
+	       elif len(LOGSCPURL) > 0:
+		       LogSummary ("Complete log available at " + LOGSCPURL + "/"+os.path.basename(LOGFILE) +"\n")
+	else:
+		CONTROL_LOG = sys.stdout
+	
+	if RUNTESTS:
 		VOL_PAR = create_bricks()
-		mount_glusterfs()
-
-		"""if "-C" not in sys.argv:
-			print "Must provide volume create options"
-			usage ()
-			sys.exit(0)
-                else:
-                        VOL_PAR = sys.argv[sys.argv.index("-C") + 1]"""
-			
-
-                """if "-y" not in sys.argv:
-                        print "Must specify the type of test"
-                        usage ()
-                        sys.exit(0)
-                else:
-                        TESTTYPE = sys.argv[sys.argv.index("-y") + 1]
-
-                if "-a" in sys.argv:
-                        testslist = sys.argv[sys.argv.index("-a") + 1]
-                        TESTNAMES = testslist.split(",")"""
 
         if "-N" in sys.argv:
                 DAEMONIZE = False

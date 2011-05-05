@@ -1,12 +1,13 @@
-#!/usr/bin/python                                                                                                                                            
+#!/usr/bin/python                                                                                                                                           
 import os
 import string
 import sys
 import commands
 import time
 import datetime
+
 START_TIMESTR = time.strftime("%d-%b-%Y-%H-%M-%S", time.localtime())
-BRICKS_IPADDRS=['192.168.1.55']
+BRICKS_IPADDRS=[]
 SERVER_EXPORT='/mnt/sanity'
 TRANSPORT='tcp'
 NUM_BRICKS='1'
@@ -15,25 +16,25 @@ RUNTESTS= True
 SETUPBRICKS = False
 VOL_PAR=""
 NFSSERVER_ADDR=''
-FUSE='1'
+FUSE=False
 TESTVOLUME=['testvol']
 MOUNTPOINT = "/tmp/sanity-testsdir-"+START_TIMESTR+"/"
 LOGFILE = "/tmp/testbot-log-"
 LOGSCPURL = ""
 LOGDOWNLOADURL = "http://shell.gluster.com/~anush/testbot"
-MAILUSER = ""
+MAILUSER = "anush@gluster.com"
 MAILPWD = ""
-MAILSRV = ""
-MAILTO = ""
+MAILSRV = "localhost"
+MAILTO = "anushshetty@gluster.com"
 TESTVOLUMES = []
 START = time.time()
 START_TIMESTR = time.strftime("%d-%b-%Y-%H-%M-%S", time.localtime())
 END = None
 SRC_DOWNLOAD_DIR = "/tmp/sanity-glusterfs-"+START_TIMESTR+"/"
-CONTROL_LOGFILE = "/tmp/sanity-control-log-"+START_TIMESTR+"/"
-TESTS_DOWNLOAD_DIR = "/tmp/shehjart-testinfos-"+START_TIMESTR+"/"
+CONTROL_LOGFILE = "/tmp/sanity-control-log-"+START_TIMESTR
+TESTS_DOWNLOAD_DIR = "/tmp/sanitytools-"+START_TIMESTR+"/"
 TESTBOT_DOWNLOAD_DIR = "/tmp/shehjart-testbot-"+START_TIMESTR+"/"
 DAEMONIZE = True
 TESTTYPE = ""
-TESTNAMES = ["*"]
+TESTNAMES = ["dbench"]
 EMAILCONTROLLOG = False
