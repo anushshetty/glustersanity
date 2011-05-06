@@ -314,6 +314,15 @@ def SetupBricks():
                 proc = Process (target=SetupBrick, args=(brick, brickchan, startvols, events,))
                 allprocs.append ((proc, mychan, brickchan))
 
+        if FUSE:
+                ev = Event ()
+                ev.clear()
+                events[NFSCLIENT_ADDR] = ev
+                mychan,brickchan = Pipe()
+                startvols = False
+                proc = Process (target=SetupBrick, args=(NFSCLIENT_ADDR, brickchan, startvols, events,))
+                allprocs.append ((proc, mychan, brickchan))
+
         allsuccess = RunProcMonitorLoop(allprocs)
         return allsuccess
 
@@ -394,7 +403,10 @@ def StartUpVolumesOnBrick (brick, controlpipe, startvols, eventlist):
 
 			if FUSE:
 				LogSummary("Mounting FUSE client on  " + NFSCLIENT_ADDR + "\n")
-				WriteBrickLog (controlpipe, brick, "Mounting FUSE client on  " + NFSCLIENT_ADDR + "\n");
+                                WriteBrickLog (controlpipe, brick, "Mounting FUSE client on  " + NFSCLIENT_ADDR)
+                                (status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+ " mkdir -p " + MOUNTPOINT + "\; glusterfs -s " + NFSSERVER_ADDR + " --volfile-id=" + volume + "  " + MOUNTPOINT + "\;")
+                                WriteBrickLog (controlpipe, brick, output)
+                                
 			else:
 				LogSummary("Mounting NFS client on  " + NFSCLIENT_ADDR + "\n")
 				WriteBrickLog (controlpipe, brick, "Mounting NFS client on  " + NFSCLIENT_ADDR)
@@ -588,8 +600,8 @@ if __name__ == "__main__":
                 NFSSERVER_ADDR = BRICKS_IPADDRS[0]
 
         
-        if "-c" in sys.argv:
-                NFSCLIENT_ADDR = sys.argv[sys.argv.index("-c") + 1]
+        if CLIENT_IP:
+                NFSCLIENT_ADDR = CLIENT_IP
 	else:
 	        NFSCLIENT_ADDR = BRICKS_IPADDRS[0]
 
