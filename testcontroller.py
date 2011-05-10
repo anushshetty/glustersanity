@@ -45,6 +45,22 @@ def create_bricks():
 		    VOL_PAR += " " + i + ":" + SERVER_EXPORT + "/1"
     return VOL_PAR
 
+
+def peer_probe():
+	for i in BRICKS_IPADDRS:
+		if i != BRICKS_IPADDRS[0]:
+			LogSummary("Peer probing " + i + "  from " +  BRICKS_IPADDRS[0] +"\n")
+			WriteLog("Peer probing " + i + "  from " +  BRICKS_IPADDRS[0])
+			(status, output) = commands.getstatusoutput("ssh root@"+BRICKS_IPADDRS[0]+" cd /tmp\;gluster peer probe "+ i);
+			WriteLog(output)
+			if status <> 0:
+				LogSummary("Peer probe on " + i + "..FAILED\n")
+				WriteLog ("Peer probe on " + i + "..FAILED")
+				sys.exit(-1)
+			else:
+				LogSummary("Peer probe on " + i + "..DONE\n")
+				WriteLog ("Peer probe on " + i + "..DONE")
+
 	
 def sendmail(
     authenticationUsername, authenticationSecret,
@@ -385,6 +401,8 @@ def StartUpVolumesOnBrick (brick, controlpipe, startvols, eventlist):
                 LogSummary ("Starting glusterd on " + brick + "..DONE\n")
                 WriteBrickLog (controlpipe, brick, "Starting glusterd on " + brick + "..DONE")
 
+	peer_probe()
+
         if not startvols:
                 LogSummary(brick + " told " + NFSSERVER_ADDR + " it can start volumes now\n")
                 WriteBrickLog (controlpipe, brick, brick + " told " + NFSSERVER_ADDR + " it can start volumes now")
@@ -400,6 +418,7 @@ def StartUpVolumesOnBrick (brick, controlpipe, startvols, eventlist):
 			LogSummary("Creating volume " + volume +" on " + brick + "\n")
                         WriteBrickLog (controlpipe, brick, "Create volume " + volume + " on " + brick)
                         (status, output) = commands.getstatusoutput("ssh root@"+brick+" gluster volume create " + volume + " " + str(VOL_PAR) + "\;")
+			print VOL_PAR
 			WriteBrickLog (controlpipe, brick, output)
 			
 			if status <> 0:
