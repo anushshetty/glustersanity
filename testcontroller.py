@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 import os
 import string
 import sys
@@ -17,7 +16,9 @@ from twisted.internet.ssl import ClientContextFactory
 from twisted.internet.defer import Deferred
 from twisted.internet import reactor
 
+PATCHES=""
 PATCHFILE=""
+BRANCH=""
 
 def LogSummary (logline):
         CONTROL_LOG.write(logline)
@@ -147,32 +148,47 @@ def SetupBrick(brick, controlpipe, startvols, eventlist):
                 LogSummary("Cloning repo on " +  brick + "..DONE\n")
                 WriteBrickLog (controlpipe, brick, "Cloning repo on " +  brick + "..DONE")
 
-        if len(PATCHFILE) > 0:
-                LogSummary("Uploading patch " +  brick+"\n")
-                WriteBrickLog (controlpipe, brick, "Uploading patch " +  brick) 
-                (status, output) = commands.getstatusoutput("scp " + PATCHFILE + " root@"+brick+":"+SRC_DOWNLOAD_DIR+"\;");
+        if len(BRANCH) > 0:
+                LogSummary("checking out " + BRANCH + " repo on " +  brick +"\n")
+                WriteBrickLog (controlpipe, brick, "checking out " + BRANCH + " repo on " +  brick)
+                (status, output) = commands.getstatusoutput("ssh root@"+brick+" cd "+SRC_DOWNLOAD_DIR + "\; git checkout " + BRANCH);
                 WriteBrickLog (controlpipe, brick, output)
 
                 if status <> 0:
-                        WriteBrickLog (controlpipe, brick, "Uploading patch " +  brick + "..FAILED")
-                        LogSummary("Uploading patch " +  brick + "..FAILED\n")
+                        LogSummary("Checking out " + BRANCH + " on " +  brick + "..FAILED\n")
+                        WriteBrickLog (controlpipe, brick, "Checking out " + BRANCH + " repo on " +  brick + "..FAILED")
                         sys.exit(-1)
                 else:
-                        LogSummary("Uploading patch " +  brick + "..DONE\n")
-                        WriteBrickLog (controlpipe, brick, "Uploading patch " +  brick + "..DONE")
+                        LogSummary("Checking out " + BRANCH + " on " +  brick + "..DONE\n")
+                        WriteBrickLog (controlpipe, brick, "Checking out " + BRANCH + " on " +  brick + "..DONE")
 
-                LogSummary("Applying patch: " + PATCHFILE + " on " + brick +"\n")
-                WriteBrickLog (controlpipe, brick, "Applying patch: " + PATCHFILE + " on " + brick) 
-                (status, output) = commands.getstatusoutput("ssh root@"+brick+" cd "+SRC_DOWNLOAD_DIR+"\;git am " + os.path.basename(PATCHFILE));
-                WriteBrickLog (controlpipe, brick, output)
+        if len(PATCHES) > 0:
+                for PATCHFILE in PATCHFILES:
+                        LogSummary("Uploading patch " +  brick+"\n")
+                        WriteBrickLog (controlpipe, brick, "Uploading patch " +  brick) 
+                        (status, output) = commands.getstatusoutput("scp " + PATCHFILE + " root@"+brick+":"+SRC_DOWNLOAD_DIR+"\;");
+                        WriteBrickLog (controlpipe, brick, output)
 
-                if status <> 0:
-                        LogSummary("Applying patch: " + PATCHFILE + " on " + brick + "..FAILED\n")
-                        WriteBrickLog (controlpipe, brick, "Applying patch: " + PATCHFILE + " on " + brick + "..FAILED")
-                        sys.exit(-1)
-                else:
-                        LogSummary("Applying patch: " + PATCHFILE + " on " + brick + "..DONE\n")
-                        WriteBrickLog (controlpipe, brick, "Applying patch: " + PATCHFILE + " on " + brick + "..DONE")
+                        if status <> 0:
+                                WriteBrickLog (controlpipe, brick, "Uploading patch " +  brick + "..FAILED")
+                                LogSummary("Uploading patch " +  brick + "..FAILED\n")
+                                sys.exit(-1)
+                        else:
+                                LogSummary("Uploading patch " +  brick + "..DONE\n")
+                                WriteBrickLog (controlpipe, brick, "Uploading patch " +  brick + "..DONE")
+
+                        LogSummary("Applying patch: " + PATCHFILE + " on " + brick +"\n")
+                        WriteBrickLog (controlpipe, brick, "Applying patch: " + PATCHFILE + " on " + brick) 
+                        (status, output) = commands.getstatusoutput("ssh root@"+brick+" cd "+SRC_DOWNLOAD_DIR+"\;git am " + os.path.basename(PATCHFILE));
+                        WriteBrickLog (controlpipe, brick, output)
+
+                        if status <> 0:
+                                LogSummary("Applying patch: " + PATCHFILE + " on " + brick + "..FAILED\n")
+                                WriteBrickLog (controlpipe, brick, "Applying patch: " + PATCHFILE + " on " + brick + "..FAILED")
+                                sys.exit(-1)
+                        else:
+                                LogSummary("Applying patch: " + PATCHFILE + " on " + brick + "..DONE\n")
+                                WriteBrickLog (controlpipe, brick, "Applying patch: " + PATCHFILE + " on " + brick + "..DONE")
 
         LogSummary("Running autogen on " + brick +"\n")
         WriteBrickLog (controlpipe, brick, "Running autogen on " + brick)
@@ -314,7 +330,7 @@ def SetupBricks():
                 proc = Process (target=SetupBrick, args=(brick, brickchan, startvols, events,))
                 allprocs.append ((proc, mychan, brickchan))
 
-        if FUSE:
+        if FUSE and NFSCLIENT_ADDR not in BRICKS_IPADDRS:
                 ev = Event ()
                 ev.clear()
                 events[NFSCLIENT_ADDR] = ev
@@ -385,6 +401,15 @@ def StartUpVolumesOnBrick (brick, controlpipe, startvols, eventlist):
                         WriteBrickLog (controlpipe, brick, "Create volume " + volume + " on " + brick)
                         (status, output) = commands.getstatusoutput("ssh root@"+brick+" gluster volume create " + volume + " " + str(VOL_PAR) + "\;")
 			WriteBrickLog (controlpipe, brick, output)
+			
+			if status <> 0:
+                                LogSummary("Creating volume " +volume+" on " + brick + "..FAILED\n")
+				WriteBrickLog (controlpipe, brick, "Creating volume "+ volume+" on " + brick + "..FAILED")
+				sys.exit(-1)
+			else:
+                                LogSummary ("Creating volume "+volume+" on " + brick + "..DONE\n")
+                                WriteBrickLog (controlpipe, brick, "Creating volume " + volume+" on " + brick + "..DONE")
+
 
                         LogSummary("Starting volume " +volume +" on " + brick + "\n")
                         WriteBrickLog (controlpipe, brick, "Starting volume " + volume + " on " + brick)
@@ -583,7 +608,11 @@ if __name__ == "__main__":
                 sys.exit(0)
 
         if "-p" in sys.argv:
-                PATCHFILE = sys.argv[sys.argv.index("-p") + 1]
+                PATCHES = sys.argv[sys.argv.index("-p") + 1]
+                PATCHFILES = PATCHES.split(",")
+
+        if "-b" in sys.argv:
+                BRANCH = sys.argv[sys.argv.index("-b") + 1]
         
 	LOGFILE = LOGFILE + timestr
 	LOGFILEFD = open (LOGFILE, "a")
