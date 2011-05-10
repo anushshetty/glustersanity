@@ -13,19 +13,22 @@ TRANSPORT='tcp'
 NUM_BRICKS='1'
 REPLICA= True
 RUNTESTS= True
-SETUPBRICKS = False
+SETUPBRICKS = True
 VOL_PAR=""
 NFSSERVER_ADDR=''
-FUSE=False
+FUSE=True
 TESTVOLUME=['testvol']
+
+CLIENT_IP=''
 MOUNTPOINT = "/tmp/sanity-testsdir-"+START_TIMESTR+"/"
+
 LOGFILE = "/tmp/testbot-log-"
 LOGSCPURL = ""
 LOGDOWNLOADURL = "http://shell.gluster.com/~anush/testbot"
 MAILUSER = "anush@gluster.com"
 MAILPWD = ""
 MAILSRV = "localhost"
-MAILTO = "anushshetty@gluster.com"
+MAILTO = ""
 TESTVOLUMES = []
 START = time.time()
 START_TIMESTR = time.strftime("%d-%b-%Y-%H-%M-%S", time.localtime())
