@@ -16,6 +16,7 @@ from twisted.internet.ssl import ClientContextFactory
 from twisted.internet.defer import Deferred
 from twisted.internet import reactor
 
+
 PATCHES=""
 PATCHFILE=""
 BRANCH=""
@@ -37,6 +38,8 @@ def create_bricks():
     if len(BRICKS_IPADDRS) == 1:
 	    if REPLICA:
 		    NUM_BRICKS=2
+	    else:
+		    NUM_BRICKS=1
 	    NUM_BRICKS=int(NUM_BRICKS)
 	    for i in range(NUM_BRICKS):
 		    VOL_PAR += " " + BRICKS_IPADDRS[0] + ":" + SERVER_EXPORT + "/"+ str(i)
@@ -513,12 +516,12 @@ def RunTestFromList(testarg):
         WriteLog("############# RUNNING " + testarg + " ###############\n")
 	(status, output) = commands.getstatusoutput("ssh root@"+NFSCLIENT_ADDR+" " + TESTS_DOWNLOAD_DIR + "/jobs.sh " + testarg + " "  + MOUNTPOINT +" \;");
 	if status <> 0:
-		LogSummary("Dbench failed\n")
-                WriteLog ("Dbench..FAILED")
+		LogSummary(testarg + " failed\n")
+                WriteLog (testarg + "..FAILED")
 		sys.exit(-1)
 	else:
-                LogSummary("Dbench..DONE\n")
-		WriteLog ("Dbench..DONE")
+                LogSummary(testarg + "..DONE\n")
+		WriteLog (testarg + "..DONE")
 	
 def RunTests():
         LogSummary("############# RUNNING TESTS ###############\n")
