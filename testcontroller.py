@@ -6,6 +6,8 @@ import commands
 import time
 import datetime
 import socket
+import smtplib
+import base64
 
 from config import *
 from multiprocessing import Process,Pipe,Event
@@ -20,6 +22,7 @@ from twisted.internet import reactor
 PATCHES=""
 PATCHFILE=""
 BRANCH=""
+FILENAME=""
 
 def LogSummary (logline):
         CONTROL_LOG.write(logline)
@@ -63,6 +66,56 @@ def peer_probe():
 			else:
 				LogSummary("Peer probe on " + i + "..DONE\n")
 				WriteLog ("Peer probe on " + i + "..DONE")
+
+
+
+def send_result_email(MAILUSER,MAILRECIEVER,FILENAME):
+    	fo = open(FILENAME, "rb")
+	filecontent = fo.read()
+	encodedcontent = base64.b64encode(filecontent)  # base64
+        timestr = time.strftime("%a %H:%M:%S %d/%m/%y", time.localtime())
+	sender = MAILUSER
+	reciever = MAILRECIEVER
+	marker = "AUNIQUEMARKER"
+
+        body ="""
+Please find the sanity log attached here.
+
+%s
+""" %(filecontent)
+# Define the main headers.
+        part1 = """From:<%s>
+To:<%s>
+Subject: Sanity Test Run - %s
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary=%s
+--%s
+""" % (sender, reciever, timestr, marker, marker)
+
+
+        part2 = """Content-Type: text/plain
+Content-Transfer-Encoding:8bit
+
+%s
+--%s
+""" % (body,marker)
+
+
+        part3 = """Content-Type: multipart/mixed; name=\"%s\"
+Content-Transfer-Encoding:base64
+Content-Disposition: attachment; filename=%s
+
+%s
+--%s--
+""" %(FILENAME, FILENAME, encodedcontent, marker)
+        message = part1 + part2 + part3
+
+	try:
+   		smtpObj = smtplib.SMTP('localhost')
+   		smtpObj.sendmail(sender, reciever, message)
+   		WriteLog("Successfully sent email")
+	except Exception:
+   		WriteLog("Error: unable to send email")
 
 	
 def sendmail(
@@ -125,12 +178,7 @@ def ebSentMessage(err):
 
 
 def SendResultsInMail ():
-        CONTROL_LOG.close()
-        log = file (CONTROL_LOGFILE)
-	print CONTROL_LOGFILE
-        result = sendmail(MAILUSER, MAILPWD, MAILUSER, MAILTO, log, MAILSRV)
-        result.addCallbacks(cbSentMessage, ebSentMessage)
-        reactor.run()
+	send_result_email(MAILUSER,MAILRECIEVER,CONTROL_LOGFILE)
 
 
 def WriteLog(logline):
@@ -170,7 +218,7 @@ def SetupBrick(brick, controlpipe, startvols, eventlist):
         if len(BRANCH) > 0:
                 LogSummary("checking out " + BRANCH + " repo on " +  brick +"\n")
                 WriteBrickLog (controlpipe, brick, "checking out " + BRANCH + " repo on " +  brick)
-                (status, output) = commands.getstatusoutput("ssh root@"+brick+" cd "+SRC_DOWNLOAD_DIR + "\; git checkout " + BRANCH);
+                (status, output) = commands.getstatusoutput("ssh root@"+brick+" cd "+SRC_DOWNLOAD_DIR + "\; git checkout -b " + BRANCH + " origin/" + BRANCH);
                 WriteBrickLog (controlpipe, brick, output)
 
                 if status <> 0:
@@ -421,7 +469,6 @@ def StartUpVolumesOnBrick (brick, controlpipe, startvols, eventlist):
 			LogSummary("Creating volume " + volume +" on " + brick + "\n")
                         WriteBrickLog (controlpipe, brick, "Create volume " + volume + " on " + brick)
                         (status, output) = commands.getstatusoutput("ssh root@"+brick+" gluster volume create " + volume + " " + str(VOL_PAR) + "\;")
-			print VOL_PAR
 			WriteBrickLog (controlpipe, brick, output)
 			
 			if status <> 0:
@@ -549,7 +596,6 @@ def ReportResults():
         LogSummary("Time taken: " + str(td) + "\n")
         WriteLog("Time taken: " + str(td) + "\n")
 
-        LOGFILEFD.close()
         if len(LOGSCPURL) > 0:
 #                LogSummary ("Copying log to " + LOGSCPURL + "\n")
 #                WriteLog ("Copying log to " + LOGSCPURL + "\n")
@@ -564,6 +610,8 @@ def ReportResults():
 
         if EMAILCONTROLLOG:
                 SendResultsInMail()
+
+        LOGFILEFD.close()
 
 def main():
         DoToolsCheck()
