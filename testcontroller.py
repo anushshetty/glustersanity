@@ -68,21 +68,31 @@ def peer_probe():
 				WriteLog ("Peer probe on " + i + "..DONE")
 
 
-def scp_email(MAILUSER,MAILRECIEVER,FILENAME):
-        LogSummary("Uploading result log to " + LOGDOWNLOADURL + "\n")
-        WriteLog("Uploading result log to " + LOGDOWNLOADURL + "\n")
+def scp_email(MAILUSER,MAILRECIEVER,FILENAME,LOGF):
+        WriteLog("Uploading summary log to " + LOGDOWNLOADURL + "\n")
         (status, output) = commands.getstatusoutput("scp " + FILENAME + "  " + LOG_REPO_MACHINE + ":" + LOG_WEB_DIR);
         WriteLog(output)
         if status <> 0:
-                LogSummary("Uploading result log to " + LOGDOWNLOADURL + " FAILED\n")
-                WriteLog("Uploading result log to " + LOGDOWNLOADURL + " FAILED\n")
+                LogSummary("Uploading summary log to " + LOGDOWNLOADURL + " FAILED\n")
+                WriteLog("Uploading summary log to " + LOGDOWNLOADURL + " FAILED\n")
         else:
-                LogSummary("Uploading result log to " + LOGDOWNLOADURL + " DONE\n")
-                WriteLog("Uploading result log to " + LOGDOWNLOADURL + " DONE\n")
+                LogSummary("Uploading summary log to " + LOGDOWNLOADURL + " DONE\n")
+                WriteLog("Uploading summary log to " + LOGDOWNLOADURL + " DONE\n")
+
+        LogSummary("Uploading complete result log to " + LOGDOWNLOADURL + "\n")
+        WriteLog("Uploading complete result log to " + LOGDOWNLOADURL + "\n")
+        (status, output) = commands.getstatusoutput("scp " + LOGF + "  " + LOG_REPO_MACHINE + ":" + LOG_WEB_DIR);
+        WriteLog(output)
+        if status <> 0:
+                LogSummary("Uploading complete result log to " + LOGDOWNLOADURL + " FAILED\n")
+                WriteLog("Uploading complete result log to " + LOGDOWNLOADURL + " FAILED\n")
+        else:
+                LogSummary("Uploading complete result log to " + LOGDOWNLOADURL + " DONE\n")
+                WriteLog("Uploading complete result log to " + LOGDOWNLOADURL + " DONE\n")
 
         LogSummary("Mailing result log to " + MAILRECIEVER + "\n")
         WriteLog("Mailing result log to " + MAILRECIEVER + "\n")
-        (status, output) = commands.getstatusoutput("ssh " + LOG_REPO_MACHINE + " mutt -s 'Solaris Sanity' -a " + LOG_WEB_DIR + "/" + os.path.basename(FILENAME) + "  " + MAILRECIEVER + " <.");
+        (status, output) = commands.getstatusoutput("ssh " + LOG_REPO_MACHINE + " mutt -s " + TEST_NAME + " -i " + LOG_WEB_DIR + "/" + os.path.basename(FILENAME) + " -a " + LOG_WEB_DIR + "/" + os.path.basename(LOGF) + "  " + MAILRECIEVER + " <.");
         WriteLog(output)
         if status <> 0:
                 LogSummary("Mailing result log to " + MAILRECIEVER + " FAIL\n")
@@ -203,7 +213,7 @@ def ebSentMessage(err):
 
 def SendResultsInMail ():
 	"""send_result_email(MAILUSER,MAILRECIEVER,CONTROL_LOGFILE)"""
-        scp_email(MAILUSER,MAILRECIEVER,CONTROL_LOGFILE)
+        scp_email(MAILUSER,MAILRECIEVER,CONTROL_LOGFILE,LOGFILE)
 
 
 def WriteLog(logline):
