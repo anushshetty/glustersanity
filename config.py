@@ -8,7 +8,7 @@ import datetime
 
 START_TIMESTR = time.strftime("%d-%b-%Y-%H-%M-%S", time.localtime())
 BRICKS_IPADDRS=['192.168.1.55']
-SERVER_EXPORT='/mnt/'
+SERVER_EXPORT='/testpool/'
 TRANSPORT='tcp'
 NUM_BRICKS=1
 REPLICA= False
@@ -25,11 +25,13 @@ MOUNTPOINT = "/tmp/sanity-testsdir-"+START_TIMESTR+"/"
 LOGFILE = "/tmp/testbot-log-"
 LOGSCPURL = ""
 LOGDOWNLOADURL = "http://shell.gluster.com/~anush/testbot"
+LOG_REPO_MACHINE ="anush@shell.gluster.com"
+LOG_WEB_DIR="public_html/testbot"
 
 MAILUSER = "anush@gluster.com"
 MAILPWD = ""
 MAILSRV = "localhost"
-MAILRECIEVER = "anushshetty@gmail.com"
+MAILRECIEVER = "anush@gluster.com"
 
 TESTVOLUMES = []
 START = time.time()
