@@ -68,6 +68,30 @@ def peer_probe():
 				WriteLog ("Peer probe on " + i + "..DONE")
 
 
+def scp_email(MAILUSER,MAILRECIEVER,FILENAME):
+        LogSummary("Uploading result log to " + LOGDOWNLOADURL + "\n")
+        WriteLog("Uploading result log to " + LOGDOWNLOADURL + "\n")
+        (status, output) = commands.getstatusoutput("scp " + FILENAME + "  " + LOG_REPO_MACHINE + ":" + LOG_WEB_DIR);
+        WriteLog(output)
+        if status <> 0:
+                LogSummary("Uploading result log to " + LOGDOWNLOADURL + " FAILED\n")
+                WriteLog("Uploading result log to " + LOGDOWNLOADURL + " FAILED\n")
+        else:
+                LogSummary("Uploading result log to " + LOGDOWNLOADURL + " DONE\n")
+                WriteLog("Uploading result log to " + LOGDOWNLOADURL + " DONE\n")
+
+        LogSummary("Mailing result log to " + MAILRECIEVER + "\n")
+        WriteLog("Mailing result log to " + MAILRECIEVER + "\n")
+        (status, output) = commands.getstatusoutput("ssh " + LOG_REPO_MACHINE + " mutt -s 'Solaris Sanity' -a " + LOG_WEB_DIR + "/" + os.path.basename(FILENAME) + "  " + MAILRECIEVER + " <.");
+        WriteLog(output)
+        if status <> 0:
+                LogSummary("Mailing result log to " + MAILRECIEVER + " FAIL\n")
+                WriteLog("Mailing result log to " + MAILRECIEVER + " FAIL\n")
+        else:
+                LogSummary("Mailing result log to " + MAILRECIEVER + " DONE\n")
+                WriteLog("Mailing result log to " + MAILRECIEVER + " DONE\n")
+
+                
 
 def send_result_email(MAILUSER,MAILRECIEVER,FILENAME):
     	fo = open(FILENAME, "rb")
@@ -178,7 +202,8 @@ def ebSentMessage(err):
 
 
 def SendResultsInMail ():
-	send_result_email(MAILUSER,MAILRECIEVER,CONTROL_LOGFILE)
+	"""send_result_email(MAILUSER,MAILRECIEVER,CONTROL_LOGFILE)"""
+        scp_email(MAILUSER,MAILRECIEVER,CONTROL_LOGFILE)
 
 
 def WriteLog(logline):
