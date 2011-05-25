@@ -7,6 +7,8 @@ import time
 import datetime
 
 START_TIMESTR = time.strftime("%d-%b-%Y-%H-%M-%S", time.localtime())
+
+TEST_NAME = "Solaris Sanity " +START_TIMESTR
 BRICKS_IPADDRS=['192.168.1.55']
 SERVER_EXPORT='/testpool/'
 TRANSPORT='tcp'
